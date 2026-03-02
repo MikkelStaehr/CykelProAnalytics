@@ -99,6 +99,23 @@ function SpecialtyBadge({ label }: { label: string | null }) {
   );
 }
 
+function FormSourceBadge({ source }: { source: RiderAnalysis["form_source"] }) {
+  if (source !== "pcs") return null;
+  return (
+    <span
+      className="text-[9px] font-semibold px-1 py-0.5 rounded"
+      style={{
+        backgroundColor: "rgba(107,107,128,0.2)",
+        color: "var(--c-muted)",
+        border: "1px solid rgba(107,107,128,0.3)",
+      }}
+      title="Form-score baseret på PCS data (ingen Holdet-data)"
+    >
+      PCS
+    </span>
+  );
+}
+
 function RiderCard({ r }: { r: RiderAnalysis }) {
   const isGreen  = r.form_flag === "green";
   const isRed    = r.form_flag === "red";
@@ -132,9 +149,10 @@ function RiderCard({ r }: { r: RiderAnalysis }) {
         {r.top_specialty && <SpecialtyBadge label={r.top_specialty} />}
       </div>
 
-      {/* Freshness + score row */}
-      <div className="flex items-center gap-1.5 mt-1.5">
+      {/* Freshness + form source + score row */}
+      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
         {r.days_since_race !== null && <FreshnessBadge days={r.days_since_race} />}
+        <FormSourceBadge source={r.form_source} />
         <span className="ml-auto text-[11px] tabular-nums" style={{ color: "var(--c-muted)" }}>
           {r.popularity > 0 ? (r.popularity * 100).toFixed(1) + "%" : "—"}
         </span>

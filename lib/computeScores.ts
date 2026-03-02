@@ -43,6 +43,8 @@ export interface RiderProfile {
   pts_climber: number;
   pts_hills: number;
   days_since_race: number | null;
+  last_race_pos: string | null;    // "1", "DNF", "DNS", etc. — from rider_profiles
+  last_race_name: string | null;   // last race name — from rider_profiles
 }
 
 // Which specialty columns are relevant for each race profile.
@@ -122,6 +124,29 @@ function specialtyRaw(
   if (!cols || cols.length === 0) return 0;
   const vals = cols.map((c) => profile[c] ?? 0);
   return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// ---------------------------------------------------------------------------
+// PCS form proxy (for riders with no Holdet data)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a 0-100 form proxy from PCS recency data.
+ * Only called for riders with no Holdet form data (form_source = "none").
+ * Uses days_since_race + last_race_pos to estimate current form.
+ */
+function pcsFormProxy(days: number, lastRacePos: string | null): number {
+  // Base score from recency
+  let base = days <= 7 ? 55 : 40;
+  // Bonus for strong recent result
+  if (lastRacePos !== null) {
+    const pos = parseInt(lastRacePos, 10);
+    if (!isNaN(pos)) {
+      if (pos <= 5)  base = Math.min(75, base + 15);
+      else if (pos <= 10) base = Math.min(65, base + 8);
+    }
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,13 +268,27 @@ export function computeScores(
     const ps = hasProfiles
       ? normProfile[i] * 0.80 + normSpecialty[i] * 0.20
       : normProfile[i];
-    const fs = normForm[i];
+    let fs = normForm[i];
     const vs = normValue[i];
 
     r.profile_score   = Math.round(ps * 10) / 10;
     r.specialty_score = Math.round(normSpecialty[i] * 10) / 10;
-    r.form_score_norm = Math.round(fs * 10) / 10;
     r.value_score     = Math.round(vs * 10) / 10;
+
+    // PCS form fallback: for riders with no Holdet form data (form_source = "none"),
+    // check if they have recent race data in rider_profiles and use it as a proxy.
+    if (r.form_source !== "holdet" && hasProfiles) {
+      const prof = riderProfiles!.get(r.rider.id);
+      const days = prof?.days_since_race ?? null;
+      if (days !== null && days <= 14) {
+        fs = pcsFormProxy(days, prof?.last_race_pos ?? null);
+        r.form_source = "pcs";
+      } else {
+        r.form_source = "none";
+      }
+    }
+
+    r.form_score_norm = Math.round(fs * 10) / 10;
     r.total_score     = Math.round((ps * 0.4 + fs * 0.4 + vs * 0.2) * 10) / 10;
   });
 }
