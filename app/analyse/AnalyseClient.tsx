@@ -23,10 +23,7 @@ interface Column {
 const FLAG_SORT: Record<RiderAnalysis["form_flag"], number> = { new: 0, red: 1, yellow: 2, green: 3 };
 
 const FLAG_BORDER: Record<RiderAnalysis["form_flag"], string> = {
-  green:  "var(--c-green)",
-  red:    "var(--c-red)",
-  yellow: "transparent",
-  new:    "transparent",
+  green: "var(--c-green)", red: "var(--c-red)", yellow: "transparent", new: "transparent",
 };
 
 function formScoreStyle(flag: RiderAnalysis["form_flag"]): React.CSSProperties {
@@ -47,31 +44,58 @@ const CAT_LABELS: Record<string, string> = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+function FormSourceBadge({ source }: { source: RiderAnalysis["form_source"] }) {
+  if (source !== "pcs") return null;
+  return (
+    <span
+      className="inline-flex items-center text-[9px] font-semibold px-1 py-0.5 rounded ml-1"
+      style={{
+        backgroundColor: "rgba(107,107,128,0.2)",
+        color: "var(--c-muted)",
+        border: "1px solid rgba(107,107,128,0.3)",
+      }}
+      title="Form-score baseret på PCS seneste løb (ingen Holdet-data)"
+    >
+      PCS
+    </span>
+  );
+}
+
 function SegmentedScoreBar({ r, compact = false }: { r: RiderAnalysis; compact?: boolean }) {
   const total = r.total_score;
   if (total <= 0) {
     return compact ? (
-      <div className="w-16 h-1.5 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
+      <div className="w-16 h-2 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
     ) : (
-      <div className="flex items-center gap-2 min-w-[80px]">
+      <div className="flex items-center gap-2 min-w-[90px]">
         <span className="text-sm tabular-nums w-8 text-right" style={{ color: "var(--c-border)" }}>—</span>
-        <div className="flex-1 h-2 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
+        <div className="flex-1 h-3 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
       </div>
     );
   }
   const pPct = ((r.profile_score * 0.4) / total) * 100;
   const fPct = ((r.form_score_norm * 0.4) / total) * 100;
   const vPct = ((r.value_score * 0.2) / total) * 100;
+  const dominant = pPct >= fPct && pPct >= vPct ? "p" : fPct >= vPct ? "f" : "v";
 
   const bar = (
     <div
-      className={`flex-1 rounded-full overflow-hidden relative ${compact ? "h-1.5" : "h-2"}`}
+      className={`flex-1 rounded-full overflow-hidden ${compact ? "h-2" : "h-3"}`}
       style={{ backgroundColor: "var(--c-border)" }}
     >
       <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${total}%` }}>
-        <div style={{ width: `${pPct}%`, backgroundColor: "#3b82f6" }} />
-        <div style={{ width: `${fPct}%`, backgroundColor: "#22c55e" }} />
-        <div style={{ width: `${vPct}%`, backgroundColor: "#f59e0b" }} />
+        <div style={{
+          width: `${pPct}%`, backgroundColor: "#3b82f6",
+          boxShadow: dominant === "p" && !compact ? "0 0 6px rgba(59,130,246,0.7)" : "none",
+        }} />
+        <div style={{
+          width: `${fPct}%`, backgroundColor: "#22c55e",
+          boxShadow: dominant === "f" && !compact ? "0 0 6px rgba(34,197,94,0.7)" : "none",
+        }} />
+        <div style={{
+          width: `${vPct}%`, backgroundColor: "#f59e0b",
+          boxShadow: dominant === "v" && !compact ? "0 0 6px rgba(245,158,11,0.7)" : "none",
+        }} />
       </div>
     </div>
   );
@@ -80,7 +104,7 @@ function SegmentedScoreBar({ r, compact = false }: { r: RiderAnalysis; compact?:
 
   return (
     <div
-      className="flex items-center gap-2 min-w-[80px]"
+      className="flex items-center gap-2 min-w-[90px]"
       title={`Total: ${total.toFixed(1)} | Profil: ${r.profile_score.toFixed(1)} | Form: ${r.form_score_norm.toFixed(1)} | Value: ${r.value_score.toFixed(1)}`}
     >
       <span className="text-sm font-semibold tabular-nums w-8 text-right" style={{ color: "var(--c-text)" }}>
@@ -97,10 +121,8 @@ function SpecialtyBadge({ label }: { label: string | null }) {
     <span
       className="text-[10px] font-medium px-1.5 py-0.5 rounded"
       style={{
-        backgroundColor: "rgba(129,140,248,0.12)",
-        color: "#818cf8",
-        border: "1px solid rgba(129,140,248,0.25)",
-        whiteSpace: "nowrap",
+        backgroundColor: "rgba(129,140,248,0.12)", color: "#818cf8",
+        border: "1px solid rgba(129,140,248,0.25)", whiteSpace: "nowrap",
       }}
     >
       {label}
@@ -108,22 +130,14 @@ function SpecialtyBadge({ label }: { label: string | null }) {
   );
 }
 
-function RacesDots({ count }: { count: number }) {
+// LØB column — shows "X/13" progress
+function RacesProgress({ count }: { count: number }) {
   return (
-    <div
-      className="flex items-center gap-0.5"
-      title={`${count} af ${TOTAL_CLASSICS} løb med point`}
-    >
-      <span className="text-xs tabular-nums mr-1" style={{ color: "var(--c-text)" }}>{count}</span>
-      <div className="flex gap-[2px]">
-        {Array.from({ length: TOTAL_CLASSICS }).map((_, i) => (
-          <div
-            key={i}
-            className="w-1 h-1 rounded-full"
-            style={{ backgroundColor: i < count ? "var(--c-green)" : "var(--c-border)" }}
-          />
-        ))}
-      </div>
+    <div className="flex items-center gap-2" title={`${count} af ${TOTAL_CLASSICS} løb med point`}>
+      <span className="text-sm font-semibold tabular-nums" style={{ color: count > 0 ? "var(--c-text)" : "var(--c-muted)" }}>
+        {count}
+      </span>
+      <span className="text-xs" style={{ color: "var(--c-border)" }}>/ {TOTAL_CLASSICS}</span>
     </div>
   );
 }
@@ -160,13 +174,13 @@ const COLUMNS: Column[] = [
     label: "Løb",
     title: `Antal løb med point > 0 ud af ${TOTAL_CLASSICS}`,
     sortValue: (r) => r.races_with_data,
-    render: (r) => <RacesDots count={r.races_with_data} />,
+    render: (r) => <RacesProgress count={r.races_with_data} />,
     align: "left",
   },
   {
     key: "total_score",
     label: "Score",
-    title: "Total score: blå=Profil, grøn=Form, gul=Value",
+    title: "Total score: blå=Profil, grøn=Form, gul=Value. Gløde på den dominerende komponent.",
     sortValue: (r) => r.total_score,
     render: (r) => <SegmentedScoreBar r={r} />,
     align: "left",
@@ -185,12 +199,11 @@ const COLUMNS: Column[] = [
     title: "Seneste×3 + næstsidste×2 + tredje×1",
     sortValue: (r) => r.form_score,
     render: (r) => (
-      <span className="text-sm tabular-nums" style={formScoreStyle(r.form_flag)}>
+      <span className="text-sm tabular-nums flex items-center" style={formScoreStyle(r.form_flag)}>
         {r.form_score > 0 ? r.form_score : (
-          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--c-border)", color: "var(--c-muted)" }}>
-            —
-          </span>
+          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--c-border)", color: "var(--c-muted)" }}>—</span>
         )}
+        <FormSourceBadge source={r.form_source} />
       </span>
     ),
     align: "right",
@@ -220,7 +233,7 @@ const COLUMNS: Column[] = [
     label: "Total",
     title: "Samlede point på sæsonen",
     sortValue: (r) => r.total_points,
-    render: (r) => <span className="text-sm tabular-nums" style={{ color: "var(--c-muted)" }}>{fmt0(r.total_points)}</span>,
+    render: (r) => <span className="text-sm tabular-nums font-medium" style={{ color: "var(--c-muted)" }}>{fmt0(r.total_points)}</span>,
     align: "right",
   },
   {
@@ -257,12 +270,7 @@ const COLUMNS: Column[] = [
     sortValue: (r) => FLAG_SORT[r.form_flag],
     render: (r) => {
       if (r.form_flag === "new") return <span className="text-xs" style={{ color: "var(--c-muted)" }}>Ny</span>;
-      return (
-        <span
-          className="inline-block w-2 h-2 rounded-full"
-          style={{ backgroundColor: FLAG_BORDER[r.form_flag] || "var(--c-muted)" }}
-        />
-      );
+      return <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: FLAG_BORDER[r.form_flag] || "var(--c-muted)" }} />;
     },
     align: "center",
   },
@@ -281,11 +289,8 @@ function Th({ col, active, dir, onClick }: { col: Column; active: boolean; dir: 
       style={{
         textAlign: col.align === "center" ? "center" : col.align === "right" ? "right" : "left",
         color: active ? "var(--c-blue)" : "var(--c-muted)",
-        fontSize: "10px",
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        backgroundColor: "var(--c-surface)",
+        fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em",
+        textTransform: "uppercase", backgroundColor: "var(--c-surface)",
       }}
     >
       {col.label}
@@ -299,28 +304,19 @@ function Th({ col, active, dir, onClick }: { col: Column; active: boolean; dir: 
 // ---------------------------------------------------------------------------
 
 function SeasonLeadersCard({
-  title,
-  accent,
-  riders,
-  metric,
-  metricLabel,
+  title, accent, riders, metric, metricLabel,
 }: {
-  title: string;
-  accent: string;
-  riders: RiderAnalysis[];
-  metric: (r: RiderAnalysis) => string;
-  metricLabel: string;
+  title: string; accent: string; riders: RiderAnalysis[];
+  metric: (r: RiderAnalysis) => string; metricLabel: string;
 }) {
   return (
     <div
-      className="flex-1 min-w-[180px] rounded-xl p-4 space-y-3"
-      style={{ backgroundColor: "var(--c-surface)", border: "1px solid var(--c-border)" }}
+      className="flex-1 min-w-[200px] rounded-xl px-5 py-4 space-y-3"
+      style={{ backgroundColor: "var(--c-surface)", border: `1px solid var(--c-border)` }}
     >
       <div className="flex items-center gap-2">
         <span className="w-[3px] h-3.5 rounded-full shrink-0" style={{ backgroundColor: accent }} />
-        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--c-muted)" }}>
-          {title}
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--c-muted)" }}>{title}</p>
       </div>
       {riders.length === 0 ? (
         <p className="text-xs" style={{ color: "var(--c-muted)" }}>Ikke nok data</p>
@@ -328,16 +324,16 @@ function SeasonLeadersCard({
         <div className="space-y-3">
           {riders.map((r, i) => (
             <div key={r.rider.id}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] w-4 text-right shrink-0 tabular-nums" style={{ color: "var(--c-border)" }}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[10px] w-4 text-right shrink-0 tabular-nums font-bold" style={{ color: i === 0 ? accent : "var(--c-border)" }}>
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate" style={{ color: "var(--c-text)" }}>{r.rider.full_name}</p>
-                  <p className="text-[10px] truncate" style={{ color: "var(--c-muted)" }}>{r.rider.team_abbr}</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: "var(--c-text)" }}>{r.rider.full_name}</p>
+                  <p className="text-[10px]" style={{ color: "var(--c-muted)" }}>{r.rider.team_abbr} · Kat. {r.rider.category_nr}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs font-semibold tabular-nums" style={{ color: accent }}>{metric(r)}</p>
+                  <p className="text-sm font-bold tabular-nums" style={{ color: accent }}>{metric(r)}</p>
                   <p className="text-[10px]" style={{ color: "var(--c-muted)" }}>{metricLabel}</p>
                 </div>
               </div>
@@ -355,11 +351,9 @@ function SeasonLeadersCard({
 // ---------------------------------------------------------------------------
 
 export default function AnalyseClient({
-  initialRiders,
-  startlistIds,
+  initialRiders, startlistIds,
 }: {
-  initialRiders: RiderAnalysis[];
-  startlistIds: number[];
+  initialRiders: RiderAnalysis[]; startlistIds: number[];
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<Category | "alle">("alle");
@@ -369,21 +363,19 @@ export default function AnalyseClient({
 
   const startlistSet = useMemo(() => new Set(startlistIds), [startlistIds]);
 
-  // Season Leaders — computed from all riders regardless of filter
-  const topFremgang = useMemo(() =>
+  // Season Leaders: Bedste form, Sæsonens bedste, Bedste value
+  const topForm = useMemo(() =>
     [...initialRiders]
-      .filter((r) => r.races_with_data >= 2)
-      .map((r) => ({ r, delta: r.trend - r.avg_points_per_race }))
-      .sort((a, b) => b.delta - a.delta)
-      .slice(0, 3)
-      .map(({ r }) => r),
+      .filter((r) => r.form_score > 0)
+      .sort((a, b) => b.form_score - a.form_score)
+      .slice(0, 3),
     [initialRiders]
   );
 
-  const topTilbagegang = useMemo(() =>
+  const topTotal = useMemo(() =>
     [...initialRiders]
-      .filter((r) => r.races_with_data >= 2)
-      .sort((a, b) => (a.latest_points - a.avg_points_per_race) - (b.latest_points - b.avg_points_per_race))
+      .filter((r) => r.total_points > 0)
+      .sort((a, b) => b.total_points - a.total_points)
       .slice(0, 3),
     [initialRiders]
   );
@@ -396,7 +388,6 @@ export default function AnalyseClient({
     [initialRiders]
   );
 
-  // Filtered + sorted table data
   const col = COLUMNS.find((c) => c.key === sortKey);
 
   const filtered = useMemo(() => {
@@ -432,9 +423,7 @@ export default function AnalyseClient({
   const cats: Array<Category | "alle"> = ["alle", "category_1", "category_2", "category_3", "category_4"];
   const catCounts = useMemo(() => {
     const counts: Record<string, number> = { alle: initialRiders.length };
-    for (const r of initialRiders) {
-      counts[r.rider.category] = (counts[r.rider.category] ?? 0) + 1;
-    }
+    for (const r of initialRiders) counts[r.rider.category] = (counts[r.rider.category] ?? 0) + 1;
     return counts;
   }, [initialRiders]);
 
@@ -442,47 +431,41 @@ export default function AnalyseClient({
     <div className="px-8 py-9 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--c-text)" }}>Analyse</h1>
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--c-text)" }}>Analyse</h1>
         <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>
           {initialRiders.length} ryttere med mindst ét after-snapshot med points &gt; 0
         </p>
       </div>
 
       {/* Season Leaders */}
-      {(topFremgang.length > 0 || topValue.length > 0) && (
+      {initialRiders.length > 0 && (
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--c-muted)" }}>
             Sæsonledere
           </p>
           <div className="flex gap-3 flex-wrap">
-            {topFremgang.length > 0 && (
+            {topForm.length > 0 && (
               <SeasonLeadersCard
-                title="Størst fremgang"
+                title="Bedste form (Holdet)"
                 accent="var(--c-green)"
-                riders={topFremgang}
-                metric={(r) => {
-                  const d = r.trend - r.avg_points_per_race;
-                  return (d >= 0 ? "+" : "") + d.toFixed(1);
-                }}
-                metricLabel="vs snit"
+                riders={topForm}
+                metric={(r) => String(Math.round(r.form_score))}
+                metricLabel="form-score"
               />
             )}
-            {topTilbagegang.length > 0 && (
+            {topTotal.length > 0 && (
               <SeasonLeadersCard
-                title="Størst tilbagegang"
-                accent="var(--c-red)"
-                riders={topTilbagegang}
-                metric={(r) => {
-                  const d = r.latest_points - r.avg_points_per_race;
-                  return (d >= 0 ? "+" : "") + d.toFixed(1);
-                }}
-                metricLabel="vs snit"
+                title="Flest sæsonpoints"
+                accent="var(--c-blue)"
+                riders={topTotal}
+                metric={(r) => String(Math.round(r.total_points))}
+                metricLabel="total pts"
               />
             )}
             {topValue.length > 0 && (
               <SeasonLeadersCard
-                title="Bedste value"
-                accent="var(--c-blue)"
+                title="Bedste value (pts/pop)"
+                accent="var(--c-amber)"
                 riders={topValue}
                 metric={(r) => r.points_per_popularity.toFixed(1)}
                 metricLabel="pts/pop"
@@ -494,26 +477,17 @@ export default function AnalyseClient({
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        {/* Search */}
         <input
           type="text"
           placeholder="Søg rytter eller hold…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="rounded-lg px-3 py-2 text-sm outline-none w-64"
-          style={{
-            backgroundColor: "var(--c-surface)",
-            border: "1px solid var(--c-border)",
-            color: "var(--c-text)",
-          }}
+          style={{ backgroundColor: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-text)" }}
         />
-
-        {/* Category buttons */}
         <div className="flex gap-1.5 flex-wrap">
           {cats.map((cat) => {
             const active = category === cat;
-            const label = cat === "alle" ? "Alle" : CAT_LABELS[cat];
-            const count = catCounts[cat] ?? 0;
             return (
               <button
                 key={cat}
@@ -525,13 +499,11 @@ export default function AnalyseClient({
                   color: active ? "var(--c-blue)" : "var(--c-muted)",
                 }}
               >
-                {label} <span className="opacity-60">{count}</span>
+                {cat === "alle" ? "Alle" : CAT_LABELS[cat]} <span className="opacity-60">{catCounts[cat] ?? 0}</span>
               </button>
             );
           })}
         </div>
-
-        {/* Startlist toggle */}
         {startlistIds.length > 0 && (
           <button
             onClick={() => setFilterStartlist((v) => !v)}
@@ -546,11 +518,7 @@ export default function AnalyseClient({
             {filterStartlist && <span className="ml-1 opacity-60">{startlistIds.length}</span>}
           </button>
         )}
-
-        {/* Result count */}
-        <span className="text-xs ml-auto" style={{ color: "var(--c-muted)" }}>
-          {sorted.length} ryttere
-        </span>
+        <span className="text-xs ml-auto" style={{ color: "var(--c-muted)" }}>{sorted.length} ryttere</span>
       </div>
 
       {/* Table */}
@@ -560,15 +528,8 @@ export default function AnalyseClient({
             <thead>
               <tr>
                 <th className="w-[3px] p-0" style={{ backgroundColor: "var(--c-surface)" }} />
-                <th
-                  className="px-3 py-2.5 w-9 text-left"
-                  style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--c-muted)", backgroundColor: "var(--c-surface)" }}
-                >
-                  #
-                </th>
-                {COLUMNS.map((c) => (
-                  <Th key={c.key} col={c} active={sortKey === c.key} dir={sortDir} onClick={() => toggleSort(c.key)} />
-                ))}
+                <th className="px-3 py-2.5 w-9 text-left" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--c-muted)", backgroundColor: "var(--c-surface)" }}>#</th>
+                {COLUMNS.map((c) => <Th key={c.key} col={c} active={sortKey === c.key} dir={sortDir} onClick={() => toggleSort(c.key)} />)}
               </tr>
             </thead>
             <tbody>
@@ -577,15 +538,15 @@ export default function AnalyseClient({
                   key={r.rider.id}
                   className="transition-colors"
                   style={{ borderTop: "1px solid var(--c-border)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   <td className="p-0 w-[3px]" style={{ backgroundColor: FLAG_BORDER[r.form_flag] }} />
-                  <td className="px-3 py-2 text-xs tabular-nums" style={{ color: "var(--c-border)" }}>{i + 1}</td>
+                  <td className="px-3 py-2.5 text-xs tabular-nums" style={{ color: "var(--c-border)" }}>{i + 1}</td>
                   {COLUMNS.map((c) => (
                     <td
                       key={c.key}
-                      className="px-3 py-2"
+                      className="px-3 py-2.5"
                       style={{
                         textAlign: c.align === "center" ? "center" : c.align === "right" ? "right" : "left",
                         backgroundColor: sortKey === c.key ? "rgba(59,130,246,0.04)" : undefined,
@@ -618,9 +579,9 @@ export default function AnalyseClient({
           </span>
           <span className="ml-auto flex items-center gap-3">
             <span>Score-bar:</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#3b82f6" }} />Profil</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#22c55e" }} />Form</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Value</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#3b82f6" }} />Profil</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#22c55e" }} />Form</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Value</span>
           </span>
         </div>
       )}

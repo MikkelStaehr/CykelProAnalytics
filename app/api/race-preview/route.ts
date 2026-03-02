@@ -5,6 +5,28 @@ import { computeScores, relatedProfiles } from "@/lib/computeScores";
 import type { FormResult, RiderProfile } from "@/lib/computeScores";
 import type { Rider, Snapshot, RiderAnalysis } from "@/lib/types";
 
+export interface HistoricalResult {
+  race_name: string;
+  race_slug: string;
+  year: number;
+  position: number;
+}
+
+export interface RiderDetails {
+  historicalResults: HistoricalResult[];
+  days_since_race: number | null;
+  last_race_name: string | null;
+  last_race_pos: string | null;
+  specialty: {
+    pts_oneday: number;
+    pts_gc: number;
+    pts_tt: number;
+    pts_sprint: number;
+    pts_climber: number;
+    pts_hills: number;
+  } | null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const race = searchParams.get("race");
@@ -39,7 +61,7 @@ export async function GET(req: NextRequest) {
     supabase.from("snapshots").select("*").in("rider_id", riderIds).limit(50000),
     supabase
       .from("rider_profiles")
-      .select("rider_id, pts_oneday, pts_gc, pts_tt, pts_sprint, pts_climber, pts_hills, days_since_race")
+      .select("rider_id, pts_oneday, pts_gc, pts_tt, pts_sprint, pts_climber, pts_hills, days_since_race, last_race_name, last_race_pos")
       .in("rider_id", riderIds),
   ]);
 
@@ -69,16 +91,20 @@ export async function GET(req: NextRequest) {
   // 6. Fetch form data for the race profile
   let validSlugs = new Set<string>();
   let formResults: FormResult[] = [];
+  const raceNameMap = new Map<string, string>();
 
   if (raceProfile) {
     const related = relatedProfiles(raceProfile);
 
     const { data: formRaceRows } = await supabase
       .from("form_races")
-      .select("slug")
+      .select("slug, name")
       .in("profile", related);
 
-    const formRaceSlugs = (formRaceRows ?? []).map((r: { slug: string }) => r.slug);
+    const formRaceSlugs = (formRaceRows ?? []).map((r: { slug: string; name: string }) => {
+      raceNameMap.set(r.slug, r.name);
+      return r.slug;
+    });
     validSlugs = new Set(formRaceSlugs);
 
     if (formRaceSlugs.length > 0) {
@@ -104,9 +130,43 @@ export async function GET(req: NextRequest) {
   // 8. Sort by total_score descending
   analyses.sort((a, b) => b.total_score - a.total_score);
 
+  // 9. Build per-rider details (historical results + profile data)
+  const riderDetails: Record<number, RiderDetails> = {};
+
+  for (const rid of riderIds) {
+    const prof = riderProfileMap.get(rid);
+    const riderFormResults = formResults
+      .filter((fr) => fr.rider_id === rid)
+      .map((fr) => ({
+        race_name: raceNameMap.get(fr.race_slug) ?? fr.race_slug,
+        race_slug: fr.race_slug,
+        year: fr.year,
+        position: fr.position,
+      }))
+      .sort((a, b) => b.year - a.year || a.position - b.position);
+
+    riderDetails[rid] = {
+      historicalResults: riderFormResults,
+      days_since_race: prof?.days_since_race ?? null,
+      last_race_name: prof?.last_race_name ?? null,
+      last_race_pos: prof?.last_race_pos ?? null,
+      specialty: prof
+        ? {
+            pts_oneday:  prof.pts_oneday,
+            pts_gc:      prof.pts_gc,
+            pts_tt:      prof.pts_tt,
+            pts_sprint:  prof.pts_sprint,
+            pts_climber: prof.pts_climber,
+            pts_hills:   prof.pts_hills,
+          }
+        : null,
+    };
+  }
+
   return NextResponse.json({
     riders: analyses,
     raceProfile,
     riderProfilesLoaded: riderProfileMap.size,
+    riderDetails,
   });
 }

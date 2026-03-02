@@ -66,6 +66,7 @@ export interface RiderAnalysis {
   points_per_popularity: number; // latest participated points / popularity
   form_score: number;            // latest×3 + second×2 + third×1 (raw)
   form_flag: "green" | "red" | "yellow" | "new";
+  form_source: "holdet" | "pcs" | "none"; // where the form score comes from
   // Score model (0-100 normalized, computed by computeScores — 0 by default)
   profile_score: number;         // 80% historical results + 20% specialty match
   specialty_score: number;       // PCS career specialty match for race profile, 0-100

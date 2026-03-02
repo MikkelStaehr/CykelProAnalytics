@@ -20,7 +20,7 @@ export default async function ProfilPage() {
 
   if (races.length === 0) {
     return (
-      <main className="px-6 py-10 max-w-2xl">
+      <main className="px-8 py-9">
         <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Løbsprofil</h1>
         <p className="mt-4 text-sm" style={{ color: "var(--c-red)" }}>
           Kunne ikke hente løb fra databasen. Tjek at Supabase-miljøvariablerne er korrekte.

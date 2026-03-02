@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Race, RiderAnalysis } from "@/lib/types";
+import type { RiderDetails, HistoricalResult } from "@/app/api/race-preview/route";
 
 type SortDir = "asc" | "desc";
 
@@ -10,19 +11,11 @@ type SortDir = "asc" | "desc";
 // ---------------------------------------------------------------------------
 
 const PROFILE_LABELS: Record<string, string> = {
-  flat:     "Flad",
-  cobbled:  "Brosten",
-  hilly:    "Bakket",
-  mixed:    "Mixed",
-  mountain: "Bjerg",
+  flat: "Flad", cobbled: "Brosten", hilly: "Bakket", mixed: "Mixed", mountain: "Bjerg",
 };
 
 const PROFILE_COLORS: Record<string, string> = {
-  flat:     "#3b82f6",
-  cobbled:  "#f59e0b",
-  hilly:    "#22c55e",
-  mixed:    "#a78bfa",
-  mountain: "#ef4444",
+  flat: "#3b82f6", cobbled: "#f59e0b", hilly: "#22c55e", mixed: "#a78bfa", mountain: "#ef4444",
 };
 
 function ProfileBadge({ profile }: { profile: string | null }) {
@@ -42,7 +35,28 @@ function ProfileBadge({ profile }: { profile: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Segmented score bar — single bar split into profile/form/value contributions
+// Form source badge
+// ---------------------------------------------------------------------------
+
+function FormSourceBadge({ source }: { source: RiderAnalysis["form_source"] }) {
+  if (source !== "pcs") return null;
+  return (
+    <span
+      className="inline-flex items-center text-[9px] font-semibold px-1 py-0.5 rounded ml-1"
+      style={{
+        backgroundColor: "rgba(107,107,128,0.2)",
+        color: "var(--c-muted)",
+        border: "1px solid rgba(107,107,128,0.3)",
+      }}
+      title="Form-score baseret på PCS seneste løb (ingen Holdet-data)"
+    >
+      PCS
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Segmented score bar
 // ---------------------------------------------------------------------------
 
 function SegmentedScoreBar({ r }: { r: RiderAnalysis }) {
@@ -51,13 +65,13 @@ function SegmentedScoreBar({ r }: { r: RiderAnalysis }) {
     return (
       <div className="flex items-center gap-2 min-w-[90px]">
         <span className="text-sm tabular-nums w-8 text-right" style={{ color: "var(--c-border)" }}>—</span>
-        <div className="flex-1 h-2 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
+        <div className="flex-1 h-3 rounded-full" style={{ backgroundColor: "var(--c-border)" }} />
       </div>
     );
   }
-  const pContrib = (r.profile_score * 0.4);
-  const fContrib = (r.form_score_norm * 0.4);
-  const vContrib = (r.value_score * 0.2);
+  const pContrib = r.profile_score * 0.4;
+  const fContrib = r.form_score_norm * 0.4;
+  const vContrib = r.value_score * 0.2;
   const pPct = (pContrib / total) * 100;
   const fPct = (fContrib / total) * 100;
   const vPct = (vContrib / total) * 100;
@@ -71,13 +85,13 @@ function SegmentedScoreBar({ r }: { r: RiderAnalysis }) {
         {total.toFixed(1)}
       </span>
       <div
-        className="flex-1 h-2 rounded-full overflow-hidden relative"
+        className="flex-1 h-3 rounded-full overflow-hidden relative"
         style={{ backgroundColor: "var(--c-border)" }}
       >
         <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${total}%` }}>
-          <div style={{ width: `${pPct}%`, backgroundColor: "#3b82f6" }} />
-          <div style={{ width: `${fPct}%`, backgroundColor: "#22c55e" }} />
-          <div style={{ width: `${vPct}%`, backgroundColor: "#f59e0b" }} />
+          <div style={{ width: `${pPct}%`, backgroundColor: "#3b82f6", boxShadow: pPct > fPct && pPct > vPct ? "0 0 6px rgba(59,130,246,0.6)" : "none" }} />
+          <div style={{ width: `${fPct}%`, backgroundColor: "#22c55e", boxShadow: fPct > pPct && fPct > vPct ? "0 0 6px rgba(34,197,94,0.6)" : "none" }} />
+          <div style={{ width: `${vPct}%`, backgroundColor: "#f59e0b", boxShadow: vPct > pPct && vPct > fPct ? "0 0 6px rgba(245,158,11,0.6)" : "none" }} />
         </div>
       </div>
     </div>
@@ -85,21 +99,13 @@ function SegmentedScoreBar({ r }: { r: RiderAnalysis }) {
 }
 
 function FreshnessCell({ days }: { days: number | null }) {
-  if (days === null) {
-    return <span className="text-xs" style={{ color: "var(--c-border)" }}>—</span>;
-  }
-  const color =
-    days <= 7  ? "var(--c-green)" :
-    days <= 14 ? "var(--c-amber)" :
-    "var(--c-red)";
+  if (days === null) return <span className="text-xs" style={{ color: "var(--c-border)" }}>—</span>;
+  const color = days <= 7 ? "var(--c-green)" : days <= 14 ? "var(--c-amber)" : "var(--c-red)";
+  const hex = days <= 7 ? "#22c55e" : days <= 14 ? "#f59e0b" : "#ef4444";
   return (
     <span
       className="inline-flex items-center gap-1 text-xs tabular-nums font-medium px-1.5 py-0.5 rounded-full"
-      style={{
-        color,
-        backgroundColor: `${color === "var(--c-green)" ? "#22c55e" : color === "var(--c-amber)" ? "#f59e0b" : "#ef4444"}18`,
-        border: `1px solid ${color === "var(--c-green)" ? "#22c55e" : color === "var(--c-amber)" ? "#f59e0b" : "#ef4444"}40`,
-      }}
+      style={{ color, backgroundColor: `${hex}18`, border: `1px solid ${hex}40` }}
       title={`${days} dage siden seneste løb`}
     >
       {days}d
@@ -112,15 +118,154 @@ function SpecialtyBadge({ label }: { label: string | null }) {
   return (
     <span
       className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-      style={{
-        backgroundColor: "rgba(129,140,248,0.12)",
-        color: "#818cf8",
-        border: "1px solid rgba(129,140,248,0.25)",
-        whiteSpace: "nowrap",
-      }}
+      style={{ backgroundColor: "rgba(129,140,248,0.12)", color: "#818cf8", border: "1px solid rgba(129,140,248,0.25)", whiteSpace: "nowrap" }}
     >
       {label}
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Specialty mini bar
+// ---------------------------------------------------------------------------
+
+function SpecialtyBar({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] w-14 shrink-0 text-right" style={{ color: "var(--c-muted)" }}>{label}</span>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--c-border)" }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: "#818cf8" }} />
+      </div>
+      <span className="text-[10px] w-8 tabular-nums" style={{ color: "var(--c-muted)" }}>{value}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Expanded rider details panel
+// ---------------------------------------------------------------------------
+
+function RiderExpansionPanel({
+  rider,
+  details,
+}: {
+  rider: RiderAnalysis;
+  details: RiderDetails | undefined;
+}) {
+  if (!details) {
+    return (
+      <div className="px-6 py-4 text-xs" style={{ color: "var(--c-muted)" }}>
+        Ingen yderligere data
+      </div>
+    );
+  }
+
+  const spec = details.specialty;
+  const specMax = spec
+    ? Math.max(spec.pts_oneday, spec.pts_gc, spec.pts_tt, spec.pts_sprint, spec.pts_climber, spec.pts_hills, 1)
+    : 1;
+
+  const top10Results = details.historicalResults.filter((r) => r.position <= 10);
+  const showResults = details.historicalResults.slice(0, 8);
+
+  return (
+    <div
+      className="grid gap-5 px-6 py-5"
+      style={{
+        backgroundColor: "rgba(17,17,24,0.7)",
+        borderTop: "1px solid var(--c-border)",
+        gridTemplateColumns: "1fr 1fr 1fr",
+      }}
+    >
+      {/* Historical results */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--c-muted)" }}>
+          Historiske resultater
+        </p>
+        {showResults.length === 0 ? (
+          <p className="text-xs" style={{ color: "var(--c-muted)" }}>Ingen data</p>
+        ) : (
+          <div className="space-y-1">
+            {showResults.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span
+                  className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
+                  style={{
+                    backgroundColor: r.position <= 3 ? "rgba(245,158,11,0.2)" : r.position <= 10 ? "rgba(59,130,246,0.15)" : "var(--c-border)",
+                    color: r.position <= 3 ? "var(--c-amber)" : r.position <= 10 ? "var(--c-blue)" : "var(--c-muted)",
+                  }}
+                >
+                  {r.position}
+                </span>
+                <span className="truncate" style={{ color: "var(--c-text)" }}>{r.race_name}</span>
+                <span className="ml-auto shrink-0" style={{ color: "var(--c-muted)" }}>{r.year}</span>
+              </div>
+            ))}
+            {top10Results.length > 0 && (
+              <p className="text-[10px] mt-2" style={{ color: "var(--c-muted)" }}>
+                {top10Results.length} top-10 resultater på dette profil
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* PCS freshness + last race */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--c-muted)" }}>
+          PCS form
+        </p>
+        <div className="space-y-2">
+          {details.days_since_race !== null && (
+            <div className="flex items-center gap-2">
+              <FreshnessCell days={details.days_since_race} />
+              <span className="text-xs" style={{ color: "var(--c-muted)" }}>siden seneste løb</span>
+            </div>
+          )}
+          {details.last_race_name && (
+            <div className="text-xs" style={{ color: "var(--c-text)" }}>
+              <span style={{ color: "var(--c-muted)" }}>Seneste: </span>
+              {details.last_race_name}
+              {details.last_race_pos && (
+                <span className="ml-1 font-semibold" style={{ color: "var(--c-blue)" }}>#{details.last_race_pos}</span>
+              )}
+            </div>
+          )}
+          <div className="text-xs flex items-center gap-2">
+            <span style={{ color: "var(--c-muted)" }}>Form kilde:</span>
+            {rider.form_source === "holdet" && (
+              <span className="font-medium" style={{ color: "var(--c-green)" }}>Holdet</span>
+            )}
+            {rider.form_source === "pcs" && (
+              <span className="font-medium" style={{ color: "var(--c-amber)" }}>PCS (fallback)</span>
+            )}
+            {rider.form_source === "none" && (
+              <span style={{ color: "var(--c-muted)" }}>Ingen data</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Specialty scores */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--c-muted)" }}>
+          Specialiteter (PCS)
+        </p>
+        {spec ? (
+          <div className="space-y-1.5">
+            <SpecialtyBar label="One-day" value={spec.pts_oneday}  max={specMax} />
+            <SpecialtyBar label="GC"      value={spec.pts_gc}       max={specMax} />
+            <SpecialtyBar label="Sprint"  value={spec.pts_sprint}   max={specMax} />
+            <SpecialtyBar label="Climber" value={spec.pts_climber}  max={specMax} />
+            <SpecialtyBar label="Puncheur" value={spec.pts_hills}   max={specMax} />
+            <SpecialtyBar label="TT"      value={spec.pts_tt}       max={specMax} />
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--c-muted)" }}>Ingen PCS-data</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -131,10 +276,7 @@ function SpecialtyBadge({ label }: { label: string | null }) {
 const FLAG_SORT: Record<RiderAnalysis["form_flag"], number> = { new: 0, red: 1, yellow: 2, green: 3 };
 
 const FLAG_BORDER: Record<RiderAnalysis["form_flag"], string> = {
-  green:  "var(--c-green)",
-  red:    "var(--c-red)",
-  yellow: "transparent",
-  new:    "transparent",
+  green: "var(--c-green)", red: "var(--c-red)", yellow: "transparent", new: "transparent",
 };
 
 function formScoreStyle(flag: RiderAnalysis["form_flag"]): React.CSSProperties {
@@ -198,7 +340,7 @@ const COLUMNS: Column[] = [
   {
     key: "days_since_race",
     label: "Frisk.",
-    title: "Dage siden seneste løb (fra PCS). Grøn < 15d, amber 15-29d, rød 30+d. Riders med 15+ dage straffes i profilscoren.",
+    title: "Dage siden seneste løb (fra PCS). Grøn < 15d, amber 15-29d, rød 30+d.",
     sortValue: (r) => r.days_since_race ?? 999,
     render: (r) => <FreshnessCell days={r.days_since_race} />,
     align: "center",
@@ -207,14 +349,15 @@ const COLUMNS: Column[] = [
     key: "form_score",
     label: "Form",
     title: "Holdet-formscore: seneste×3 + næstsidste×2 + tredje×1",
-    sortValue: (r) => r.form_score,
+    sortValue: (r) => r.form_score_norm,
     render: (r) => (
-      <span className="text-sm tabular-nums" style={formScoreStyle(r.form_flag)}>
-        {r.form_score > 0 ? r.form_score : (
+      <span className="text-sm tabular-nums flex items-center" style={formScoreStyle(r.form_flag)}>
+        {r.form_score_norm > 0 ? r.form_score_norm.toFixed(1) : (
           <span className="text-xs px-1.5 py-0.5 rounded-full font-normal" style={{ backgroundColor: "var(--c-border)", color: "var(--c-muted)" }}>
             Ingen data
           </span>
         )}
+        <FormSourceBadge source={r.form_source} />
       </span>
     ),
     align: "right",
@@ -258,16 +401,11 @@ const COLUMNS: Column[] = [
   {
     key: "flag",
     label: "",
-    title: "Formstatus: grøn = over snit, rød = seneste 0pt",
+    title: "Formstatus",
     sortValue: (r) => FLAG_SORT[r.form_flag],
     render: (r) => {
       if (r.form_flag === "new") return <span className="text-xs" style={{ color: "var(--c-muted)" }}>Ny</span>;
-      return (
-        <span
-          className="inline-block w-2 h-2 rounded-full"
-          style={{ backgroundColor: FLAG_BORDER[r.form_flag] || "var(--c-muted)" }}
-        />
-      );
+      return <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: FLAG_BORDER[r.form_flag] || "var(--c-muted)" }} />;
     },
     align: "center",
   },
@@ -278,11 +416,7 @@ const COLUMNS: Column[] = [
 // ---------------------------------------------------------------------------
 
 function InsightCard({
-  icon,
-  label,
-  riders,
-  metric,
-  color,
+  icon, label, riders, metric, color,
 }: {
   icon: string;
   label: string;
@@ -292,24 +426,28 @@ function InsightCard({
 }) {
   return (
     <div
-      className="flex-1 min-w-[200px] rounded-xl px-4 py-3 space-y-2"
-      style={{ backgroundColor: "var(--c-surface)", border: "1px solid var(--c-border)" }}
+      className="flex-1 min-w-[200px] rounded-xl px-5 py-4 space-y-3"
+      style={{ backgroundColor: "var(--c-surface)", border: `1px solid ${color}33` }}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--c-muted)" }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color }}>
         {icon} {label}
       </p>
-      <div className="space-y-1.5">
+      <div className="space-y-2.5">
         {riders.map((r, i) => (
-          <div key={r.rider.id} className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] tabular-nums w-3 shrink-0" style={{ color: "var(--c-muted)" }}>{i + 1}.</span>
-              <span className="text-xs truncate font-medium" style={{ color: "var(--c-text)" }}>
-                {r.rider.full_name}
+          <div key={r.rider.id} className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="text-[11px] tabular-nums font-bold w-4 shrink-0 text-center"
+                style={{ color: i === 0 ? color : "var(--c-muted)" }}
+              >
+                {i + 1}
               </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: "var(--c-text)" }}>{r.rider.full_name}</p>
+                <p className="text-[10px]" style={{ color: "var(--c-muted)" }}>{r.rider.team_abbr} · Kat. {r.rider.category_nr}</p>
+              </div>
             </div>
-            <span className="text-xs tabular-nums shrink-0 font-semibold" style={{ color }}>
-              {metric(r)}
-            </span>
+            <span className="text-sm tabular-nums shrink-0 font-bold" style={{ color }}>{metric(r)}</span>
           </div>
         ))}
       </div>
@@ -350,12 +488,14 @@ function Th({ col, active, dir, onClick }: { col: Column; active: boolean; dir: 
 export default function RacePreviewClient({ races }: { races: Race[] }) {
   const [selectedRace, setSelectedRace] = useState(races[0]?.slug ?? "");
   const [riders, setRiders] = useState<RiderAnalysis[]>([]);
+  const [riderDetails, setRiderDetails] = useState<Record<number, RiderDetails>>({});
   const [raceProfile, setRaceProfile] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState("total_score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [expandedRiderId, setExpandedRiderId] = useState<number | null>(null);
 
   const selectedRaceObj = races.find((r) => r.slug === selectedRace) ?? null;
 
@@ -381,12 +521,13 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
 
   const fetchRiders = useCallback(async (race: string) => {
     if (!race) return;
-    setLoading(true); setError(null); setMessage(null); setRiders([]);
+    setLoading(true); setError(null); setMessage(null); setRiders([]); setRiderDetails({}); setExpandedRiderId(null);
     try {
       const res = await fetch(`/api/race-preview?race=${encodeURIComponent(race)}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Ukendt fejl"); return; }
       setRiders(data.riders ?? []);
+      setRiderDetails(data.riderDetails ?? {});
       setRaceProfile(data.raceProfile ?? null);
       if (data.message) setMessage(data.message);
     } catch { setError("Netværksfejl — kunne ikke hente data."); }
@@ -395,10 +536,9 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
 
   useEffect(() => { fetchRiders(selectedRace); }, [selectedRace, fetchRiders]);
 
-  // Insight card data (top 3 per metric)
   const withData = riders.filter((r) => r.total_score > 0);
   const topProfile = [...withData].sort((a, b) => b.profile_score - a.profile_score).slice(0, 3);
-  const topForm    = [...withData].sort((a, b) => b.form_score - a.form_score).filter((r) => r.form_score > 0).slice(0, 3);
+  const topForm    = [...withData].sort((a, b) => b.form_score_norm - a.form_score_norm).filter((r) => r.form_score_norm > 0).slice(0, 3);
   const topValue   = [...withData].sort((a, b) => b.points_per_popularity - a.points_per_popularity).filter((r) => r.points_per_popularity > 0).slice(0, 3);
 
   return (
@@ -406,10 +546,8 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
       {/* Header */}
       <div className="flex flex-wrap items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--c-text)" }}>Race Preview</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>
-            Startliste rangeret efter samlet model-score
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--c-text)" }}>Race Preview</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Startliste rangeret efter samlet model-score · klik en rytter for detaljer</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           {selectedRaceObj?.profile && <ProfileBadge profile={selectedRaceObj.profile} />}
@@ -435,7 +573,7 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
             <span><span style={{ color: "var(--c-text)" }} className="font-medium">{selectedRaceObj.elevation_m.toLocaleString("da-DK")}</span> m stigning</span>
           )}
           {raceProfile && (
-            <span>Profil-gruppe: <span style={{ color: "var(--c-text)" }} className="font-medium">{PROFILE_LABELS[raceProfile] ?? raceProfile}</span></span>
+            <span>Profil: <span style={{ color: "var(--c-text)" }} className="font-medium">{PROFILE_LABELS[raceProfile] ?? raceProfile}</span></span>
           )}
         </div>
       )}
@@ -464,31 +602,13 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
       {!loading && riders.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {topProfile.length > 0 && (
-            <InsightCard
-              icon="🏆"
-              label="Bedste profil-match"
-              riders={topProfile}
-              metric={(r) => r.profile_score.toFixed(1)}
-              color="var(--c-blue)"
-            />
+            <InsightCard icon="🏆" label="Bedste profil-match" riders={topProfile} metric={(r) => r.profile_score.toFixed(1)} color="var(--c-blue)" />
           )}
           {topForm.length > 0 && (
-            <InsightCard
-              icon="📈"
-              label="Bedste aktuelle form"
-              riders={topForm}
-              metric={(r) => String(r.form_score)}
-              color="var(--c-green)"
-            />
+            <InsightCard icon="📈" label="Bedste aktuelle form" riders={topForm} metric={(r) => r.form_score_norm.toFixed(1)} color="var(--c-green)" />
           )}
           {topValue.length > 0 && (
-            <InsightCard
-              icon="💎"
-              label="Bedste value"
-              riders={topValue}
-              metric={(r) => r.points_per_popularity.toFixed(1)}
-              color="var(--c-amber)"
-            />
+            <InsightCard icon="💎" label="Bedste value" riders={topValue} metric={(r) => r.points_per_popularity.toFixed(1)} color="var(--c-amber)" />
           )}
         </div>
       )}
@@ -506,6 +626,9 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
             {riders.filter((r) => r.form_flag === "red").length} tilbagegang
           </span>
           <span>{riders.filter((r) => r.form_flag === "new").length} ingen Holdet-data</span>
+          {riders.filter((r) => r.form_source === "pcs").length > 0 && (
+            <span>{riders.filter((r) => r.form_source === "pcs").length} med PCS form-fallback</span>
+          )}
         </div>
       )}
 
@@ -521,30 +644,46 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r, i) => (
-                <tr
-                  key={r.rider.id}
-                  className="transition-colors"
-                  style={{ borderTop: `1px solid var(--c-border)` }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                >
-                  <td className="p-0 w-[3px]" style={{ backgroundColor: FLAG_BORDER[r.form_flag] }} />
-                  <td className="px-3 py-2 text-xs tabular-nums" style={{ color: "var(--c-border)" }}>{i + 1}</td>
-                  {COLUMNS.map((c) => (
-                    <td
-                      key={c.key}
-                      className="px-3 py-2"
+              {sorted.map((r, i) => {
+                const isExpanded = expandedRiderId === r.rider.id;
+                return (
+                  <>
+                    <tr
+                      key={r.rider.id}
+                      className="transition-colors cursor-pointer"
                       style={{
-                        textAlign: c.align === "center" ? "center" : c.align === "right" ? "right" : "left",
-                        backgroundColor: sortKey === c.key ? "rgba(59,130,246,0.04)" : undefined,
+                        borderTop: "1px solid var(--c-border)",
+                        backgroundColor: isExpanded ? "rgba(59,130,246,0.06)" : "transparent",
                       }}
+                      onClick={() => setExpandedRiderId(isExpanded ? null : r.rider.id)}
+                      onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+                      onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = "transparent"; }}
                     >
-                      {c.render(r)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+                      <td className="p-0 w-[3px]" style={{ backgroundColor: FLAG_BORDER[r.form_flag] }} />
+                      <td className="px-3 py-2.5 text-xs tabular-nums" style={{ color: "var(--c-border)" }}>{i + 1}</td>
+                      {COLUMNS.map((c) => (
+                        <td
+                          key={c.key}
+                          className="px-3 py-2.5"
+                          style={{
+                            textAlign: c.align === "center" ? "center" : c.align === "right" ? "right" : "left",
+                            backgroundColor: sortKey === c.key ? "rgba(59,130,246,0.04)" : undefined,
+                          }}
+                        >
+                          {c.render(r)}
+                        </td>
+                      ))}
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${r.rider.id}-expanded`} style={{ borderTop: "none" }}>
+                        <td colSpan={COLUMNS.length + 2} className="p-0">
+                          <RiderExpansionPanel rider={r} details={riderDetails[r.rider.id]} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -563,14 +702,9 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
           </span>
           <span className="ml-auto flex items-center gap-3">
             <span>Score-bar:</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#3b82f6" }} />Profil</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#22c55e" }} />Form</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Value</span>
-            <span className="flex items-center gap-3 ml-2" style={{ borderLeft: "1px solid var(--c-border)", paddingLeft: "0.75rem" }}>
-              <span className="flex items-center gap-1"><span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--c-green)" }} />≤7d</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--c-amber)" }} />8-14d</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--c-red)" }} />15+d straf</span>
-            </span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#3b82f6" }} />Profil</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#22c55e" }} />Form</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />Value</span>
           </span>
         </div>
       )}

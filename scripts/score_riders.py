@@ -299,7 +299,7 @@ def fetch_rider_profiles(supabase: Client, rider_ids: list[int]) -> dict[int, di
     try:
         res = (
             supabase.table("rider_profiles")
-            .select("rider_id, pts_oneday, pts_gc, pts_tt, pts_sprint, pts_climber, pts_hills, days_since_race")
+            .select("rider_id, pts_oneday, pts_gc, pts_tt, pts_sprint, pts_climber, pts_hills, days_since_race, last_race_pos, last_race_name")
             .in_("rider_id", rider_ids)
             .execute()
         )
@@ -390,6 +390,27 @@ def specialty_raw_score(
         return 0.0
     values = [float(profile_data.get(col, 0) or 0) for col in cols]
     return sum(values) / len(values) if values else 0.0
+
+
+def pcs_form_proxy(days_since_race: int, last_race_pos: Optional[str]) -> float:
+    """
+    Estimate a form score (0-75) from PCS freshness data for riders with no Holdet form.
+    Mirrors the pcsFormProxy() function in lib/computeScores.ts.
+    - days <= 7: base 55 (very fresh)
+    - days 8-14: base 40 (somewhat fresh)
+    - bonus for good last position: ≤5 → +15 (capped at 75), ≤10 → +8 (capped at 65)
+    """
+    base = 55.0 if days_since_race <= 7 else 40.0
+    if last_race_pos is not None:
+        try:
+            pos = int(last_race_pos)
+            if pos <= 5:
+                base = min(75.0, base + 15.0)
+            elif pos <= 10:
+                base = min(65.0, base + 8.0)
+        except ValueError:
+            pass  # "DNF", "DNS", etc. — no bonus
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -638,8 +659,13 @@ def main() -> None:
         # Rider profile signals (from fetch_rider_profiles.py)
         profile_data    = rider_profiles_map.get(rider_id)
         days_since_race = profile_data.get("days_since_race") if profile_data else None
+        last_race_pos   = profile_data.get("last_race_pos") if profile_data else None
+        last_race_name  = profile_data.get("last_race_name") if profile_data else None
         freshness_mult  = freshness_multiplier(days_since_race)
         raw_specialty   = specialty_raw_score(profile_data, race_profile)
+
+        # form_source: where the form score comes from
+        form_source = "holdet" if holdet_form > 0 else "none"
 
         # Apply freshness penalty to historical profile score
         raw_profile_adj = raw_profile * freshness_mult
@@ -653,12 +679,16 @@ def main() -> None:
             "form_flag":      flag,
             "popularity":     round(popularity * 100, 2),
             "days_since_race": days_since_race,
+            "last_race_name": last_race_name,
             "freshness_mult": freshness_mult,
             # raw scores (pre-normalization)
             "_raw_profile":   raw_profile_adj,
             "_raw_form":      float(holdet_form),
             "_raw_value":     ppp,
             "_raw_specialty": raw_specialty,
+            # PCS fallback data (used in step 7)
+            "_form_source":   form_source,
+            "_last_race_pos": last_race_pos,
         })
 
     if not scored:
@@ -680,6 +710,7 @@ def main() -> None:
     # --- Step 7: combine into total_score ---
     # profile_score = 80% historical results + 20% PCS specialty match
     # total_score   = profile_score × 0.40 + form_score × 0.40 + value_score × 0.20
+    has_profiles = bool(rider_profiles_map)
     for i, rider in enumerate(scored):
         ps_hist = norm_profiles[i]
         ps_spec = norm_specialties[i]
@@ -687,6 +718,17 @@ def main() -> None:
 
         fs = norm_forms[i]
         vs = norm_values[i]
+
+        # PCS form fallback: if no Holdet data and rider raced recently, use proxy
+        form_source = rider["_form_source"]
+        if form_source != "holdet" and has_profiles:
+            days = rider.get("days_since_race")
+            if days is not None and days <= 14:
+                fs = pcs_form_proxy(days, rider["_last_race_pos"])
+                form_source = "pcs"
+            else:
+                form_source = "none"
+
         total = ps * 0.40 + fs * 0.40 + vs * 0.20
 
         rider["profile_score"]   = round(ps, 1)
@@ -694,12 +736,15 @@ def main() -> None:
         rider["form_score"]      = round(fs, 1)
         rider["value_score"]     = round(vs, 1)
         rider["total_score"]     = round(total, 1)
+        rider["form_source"]     = form_source
 
-        # Clean up raw keys
+        # Clean up raw/temp keys
         del rider["_raw_profile"]
         del rider["_raw_form"]
         del rider["_raw_value"]
         del rider["_raw_specialty"]
+        del rider["_form_source"]
+        del rider["_last_race_pos"]
 
     # --- Step 8: sort and output ---
     scored.sort(key=lambda r: r["total_score"], reverse=True)
@@ -728,6 +773,9 @@ def main() -> None:
 
     profiles_available = sum(1 for r in scored if r.get("days_since_race") is not None)
     penalized          = sum(1 for r in scored if r.get("freshness_mult", 1.0) < 1.0)
+    pcs_fallback_count = sum(1 for r in scored if r.get("form_source") == "pcs")
+    if pcs_fallback_count:
+        _log(f"  ℹ {pcs_fallback_count} riders using PCS form proxy (no Holdet data)")
 
     # --- Step 9: budget optimizer (stage races) ---
     suggested_team: list[dict] = []
@@ -789,6 +837,7 @@ def main() -> None:
         "profile_races_used":    len(same_profile_slugs),
         "rider_profiles_loaded": profiles_available,
         "freshness_penalized":   penalized,
+        "pcs_form_fallback":     pcs_fallback_count,
         "riders":                top,
         "suggested_team":        suggested_team,
     }

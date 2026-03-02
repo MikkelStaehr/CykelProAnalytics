@@ -90,6 +90,7 @@ export function computeAnalysis(rider: Rider, snapshots: Snapshot[]): RiderAnaly
     points_per_popularity,
     form_score,
     form_flag,
+    form_source: form_score > 0 ? "holdet" : "none",
     // Score model — populated later by computeScores(); 0 / null until then
     profile_score: 0,
     specialty_score: 0,

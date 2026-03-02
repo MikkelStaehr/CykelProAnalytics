@@ -235,7 +235,7 @@ export default function AdminClient({ races }: { races: Race[] }) {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-8 py-9 space-y-6">
+    <div className="px-8 py-9 space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--c-text)" }}>Admin</h1>
         <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Datahåndtering — kør scripts manuelt.</p>
