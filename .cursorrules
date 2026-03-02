@@ -1,0 +1,101 @@
+# Cursor Rules — Fantasy Cycling Tracker
+
+## Role
+You are an expert Next.js and Python developer building a fantasy cycling analytics web app. Always read CONTEXT.md before starting any task. It contains the full data model, API endpoints, auth flow, and business logic.
+
+## Core Principles
+
+### 1. Read before you build
+Always check CONTEXT.md and existing files before writing new code. Never assume structure — verify it.
+
+### 2. Stay on track
+This is a focused analytics tool. Do not add features, pages, or complexity that are not described in CONTEXT.md or explicitly requested. If unsure, ask before building.
+
+### 3. One thing at a time
+Complete and test one feature fully before moving to the next. Do not scaffold everything at once and leave it half-finished.
+
+### 4. Simple over clever
+Prefer readable, simple code over clever abstractions. This codebase may be extended to a football scouting tool later, so keep logic modular and well-commented.
+
+---
+
+## Tech Stack Rules
+
+### Next.js
+- Use App Router (not Pages Router)
+- API routes go in `/app/api/`
+- Use server components where possible, client components only when needed (interactivity)
+- Use `fetch` with proper error handling in all API routes
+
+### Python
+- Python scripts live in `/scripts/`
+- Each script has a single responsibility (e.g. `fetch_holdet.py`, `parse_pcs.py`, `match_riders.py`)
+- All scripts must handle errors gracefully and return structured JSON output
+- Use `httpx` for HTTP requests, `beautifulsoup4` for HTML parsing
+- Always normalize rider names before matching (see CONTEXT.md for normalization function)
+
+### Supabase
+- Use the service key (not anon key) for server-side writes
+- Use the anon key for client-side reads only
+- Always handle Supabase errors explicitly — never silently fail
+- Follow the schema in CONTEXT.md exactly — do not add or rename columns without asking
+
+### Styling
+- Use Tailwind CSS
+- Keep UI clean and functional — this is an analytics tool, not a marketing site
+- Tables should be sortable and filterable
+- Use green/yellow/red colors consistently for form flags (🟢🟡🔴🆕)
+
+---
+
+## Data & Business Logic Rules
+
+### Never change these rules without asking:
+- A rider "participated" in a race ONLY if `points > 0` in the after-snapshot
+- Popularity alone does NOT indicate participation
+- Form score = latest × 3 + second latest × 2 + third latest × 1
+- Only races where `points > 0` count toward averages, totals, and trends
+- Always use the normalization function from CONTEXT.md when matching PCS names to Holdet IDs
+
+### Holdet Auth:
+- Never hardcode credentials — always use environment variables
+- Store session token securely — never expose it to the client
+- Handle token expiry gracefully with a clear error message in the UI
+
+---
+
+## File Structure
+```
+/app
+  /page.tsx                  # Dashboard
+  /race-preview/page.tsx     # Race Preview
+  /analyse/page.tsx          # Full analysis
+  /admin/page.tsx            # Data management (fetch buttons)
+  /api
+    /fetch-holdet/route.ts   # Calls Python fetch_holdet.py
+    /fetch-pcs/route.ts      # Calls Python parse_pcs.py
+    /riders/route.ts         # Read riders from Supabase
+    /snapshots/route.ts      # Read snapshots from Supabase
+/scripts
+  fetch_holdet.py            # Login + fetch players from Holdet API
+  parse_pcs.py               # Scrape + parse PCS startlist HTML
+  match_riders.py            # Match PCS names to Holdet IDs
+  analyse.py                 # Calculate metrics (form score, avg, trend etc.)
+/lib
+  supabase.ts                # Supabase client setup
+  types.ts                   # TypeScript types matching DB schema
+CONTEXT.md                   # Always read this first
+.cursorrules                 # This file
+.env.local                   # Never commit this
+```
+
+---
+
+## What NOT to do
+- Do not use Pages Router
+- Do not use any ORM (use Supabase SDK directly)
+- Do not add authentication to the web app itself — it is a personal tool
+- Do not add unnecessary npm packages — keep dependencies minimal
+- Do not modify the database schema without updating CONTEXT.md first
+- Do not use `any` type in TypeScript — always type properly
+- Do not silently swallow errors — always surface them in the UI or logs
