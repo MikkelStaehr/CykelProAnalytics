@@ -144,7 +144,7 @@ export default async function DashboardPage() {
   const hasSeasonData = snapsByRider.size > 0;
 
   return (
-    <div className="px-8 py-9 max-w-3xl space-y-8">
+    <div className="px-8 py-9 space-y-8">
 
       {/* Header */}
       <div>

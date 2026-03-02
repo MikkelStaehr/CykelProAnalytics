@@ -20,7 +20,7 @@ export default async function AdminPage() {
 
   if (races.length === 0) {
     return (
-      <main className="max-w-2xl mx-auto px-6 py-10">
+      <main className="px-8 py-9">
         <h1 className="text-2xl font-bold text-gray-100">Admin</h1>
         <p className="mt-4 text-red-400 text-sm">
           Kunne ikke hente løb fra databasen. Tjek at Supabase-miljøvariablerne er sat
