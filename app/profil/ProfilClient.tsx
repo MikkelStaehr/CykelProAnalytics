@@ -319,7 +319,7 @@ export default function ProfilClient({ races }: { races: Race[] }) {
 
       {!loading && data && data.startlist.length === 0 && !data.message && (
         <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: "var(--c-surface)", border: "1px solid var(--c-border)", color: "var(--c-muted)" }}>
-          Ingen startliste endnu — kør 'Fetch PCS Startlist' i Admin.
+          Ingen startliste endnu — kør &apos;Fetch PCS Startlist&apos; i Admin.
         </div>
       )}
     </div>

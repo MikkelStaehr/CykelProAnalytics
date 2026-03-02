@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
 import { relatedProfiles, rawProfileScore } from "@/lib/computeScores";
 import type { FormResult } from "@/lib/computeScores";
-import type { Rider, Snapshot } from "@/lib/types";
+import type { Rider } from "@/lib/types";
 
 // ---- normalize helper (same as computeScores) ----
 function normalizeToHundred(values: number[]): number[] {
