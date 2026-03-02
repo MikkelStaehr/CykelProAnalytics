@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Race, RiderAnalysis } from "@/lib/types";
-import type { RiderDetails, HistoricalResult } from "@/app/api/race-preview/route";
+import type { RiderDetails } from "@/app/api/race-preview/route";
 
 type SortDir = "asc" | "desc";
 
