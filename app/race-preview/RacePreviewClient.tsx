@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type { Race, RiderAnalysis } from "@/lib/types";
 import type { RiderDetails } from "@/app/api/race-preview/route";
 
@@ -647,9 +647,8 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
               {sorted.map((r, i) => {
                 const isExpanded = expandedRiderId === r.rider.id;
                 return (
-                  <>
+                  <React.Fragment key={r.rider.id}>
                     <tr
-                      key={r.rider.id}
                       className="transition-colors cursor-pointer"
                       style={{
                         borderTop: "1px solid var(--c-border)",
@@ -681,7 +680,7 @@ export default function RacePreviewClient({ races }: { races: Race[] }) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
